@@ -248,10 +248,6 @@ void pm_update_status_info(void)
  */
 _attribute_ram_code_sec_noinline_ void  pm_sleep_start(void)
 {
-	//This is 1.4V and 1.8V power supply during sleep. Do not power on during initialization, because after power on,
-	//there will be two power supplies at the same time, which may cause abnormalities.add by weihua.zhang, confirmed by haitao 20210107
-	analog_write_reg8(0x0b, analog_read_reg8(0x0b) & ~(BIT(0) | BIT(1)));	//<0>:pd_nvt_1p4,	power on native 1P4.
-																			//<1>:pd_nvt_1p8,	power on native 1P8.
 	//A0 chip cann't disable baseband,A1 need disable baseband.See sys_init for specific instructions.(add by weihua zhang, confirmed by junwen 20200925)
 	if(0xff == g_chip_version){	//A0
 		analog_write_reg8(0x7d, g_pm_suspend_power_cfg&0xfe);
@@ -264,7 +260,13 @@ _attribute_ram_code_sec_noinline_ void  pm_sleep_start(void)
 	mspi_wait();
 	mspi_high();
 	write_reg8(0x140329, 0x00);	//MSPI ie disable
-	analog_write_reg8(0x81, analog_read_reg8(0x81) | BIT(7));
+
+	//This is 1.4V and 1.8V power supply during sleep. Do not power on during initialization, because after power on,
+	//there will be two power supplies at the same time, which may cause abnormalities.add by weihua.zhang, confirmed by haitao 20210107
+	analog_write_reg8(0x0b, analog_read_reg8(0x0b) & ~(BIT(0) | BIT(1)));	//<0>:pd_nvt_1p4,	power on native 1P4.
+																			//<1>:pd_nvt_1p8,	power on native 1P8.
+
+	//analog_write_reg8(0x81, analog_read_reg8(0x81) | BIT(7));
 
     write_reg8(0x1401ef,0x80);	//trig pwdn
 
@@ -274,20 +276,10 @@ _attribute_ram_code_sec_noinline_ void  pm_sleep_start(void)
     //but to be on the safe side, add 64 empty instructions.
 	for(volatile unsigned int i = 0; i < 64; i++){
 		__asm__("nop");
-	    }
+	}
 
-	analog_write_reg8(0x81, analog_read_reg8(0x81) & (~BIT(7)));
-	//The flash two-wire system uses clk+cn+ two communication lines, and the flash four-wire system uses
-	//clk+cn+ four communication lines. Before suspend sleep, the input of the six lines (PF0-PF5) used
-	//by flash will be disabled. After suspend wakes up, the six lines will be set to input function.
-	//(changed by weihua.zhang, confirmed by jianzhi 20201201)
-	write_reg8(0x140329, 0x3f);	//MSPI(PF0-PF5) ie enable
-	mspi_low();
-	mspi_write(0xab);	//flash wakeup
-	mspi_wait();
-	mspi_high();
+	//analog_write_reg8(0x81, analog_read_reg8(0x81) & (~BIT(7)));
 
-	analog_write_reg8(0x7d, 0x80); // enable digital bb, usb, npe
 	analog_write_reg8(0x0b, analog_read_reg8(0x0b) | (BIT(0) | BIT(1)));	//<0>:pd_nvt_1p4,	power down native 1P4.
 																			//<1>:pd_nvt_1p8,	power down native 1P8.
 	//wait for xtal stable
@@ -300,6 +292,21 @@ _attribute_ram_code_sec_noinline_ void  pm_sleep_start(void)
 	while( BIT(7) != (analog_read_reg8(0x88) & (BIT(7)))); //0x88<7>: xo_ready_ana
 
 	pm_wait_bbpll_done();
+
+	analog_write_reg8(0x7d, 0x80); // enable digital bb, usb, npe
+	
+	//The clock of mspi uses 24M crystal oscillator and PLL, so you need to wait for PLL to stabilize
+	//before sending commands to flash. Otherwise, abnormal phenomena may occur.
+	//(changed by weihua.zhang, confirmed by wenfeng and junwen 20210126)
+	//The flash two-wire system uses clk+cn+ two communication lines, and the flash four-wire system uses
+	//clk+cn+ four communication lines. Before suspend sleep, the input of the six lines (PF0-PF5) used
+	//by flash will be disabled. After suspend wakes up, the six lines will be set to input function.
+	//(changed by weihua.zhang, confirmed by jianzhi 20201201)
+	write_reg8(0x140329, 0x3f);	//MSPI(PF0-PF5) ie enable
+	mspi_low();
+	mspi_write(0xab);	//flash wakeup
+	mspi_wait();
+	mspi_high();
 }
 
 /**
