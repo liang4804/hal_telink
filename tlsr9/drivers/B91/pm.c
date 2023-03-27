@@ -266,7 +266,7 @@ _attribute_ram_code_sec_noinline_ void  pm_sleep_start(void)
 	analog_write_reg8(0x0b, analog_read_reg8(0x0b) & ~(BIT(0) | BIT(1)));	//<0>:pd_nvt_1p4,	power on native 1P4.
 																			//<1>:pd_nvt_1p8,	power on native 1P8.
 
-	//analog_write_reg8(0x81, analog_read_reg8(0x81) | BIT(7));
+	analog_write_reg8(0x81, analog_read_reg8(0x81) | BIT(7));
 
     write_reg8(0x1401ef,0x80);	//trig pwdn
 
@@ -278,7 +278,7 @@ _attribute_ram_code_sec_noinline_ void  pm_sleep_start(void)
 		__asm__("nop");
 	}
 
-	//analog_write_reg8(0x81, analog_read_reg8(0x81) & (~BIT(7)));
+	analog_write_reg8(0x81, analog_read_reg8(0x81) & (~BIT(7)));
 
 	analog_write_reg8(0x0b, analog_read_reg8(0x0b) | (BIT(0) | BIT(1)));	//<0>:pd_nvt_1p4,	power down native 1P4.
 																			//<1>:pd_nvt_1p8,	power down native 1P8.
