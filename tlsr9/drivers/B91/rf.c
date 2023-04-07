@@ -65,6 +65,7 @@ const rf_power_level_e rf_power_Level_list[30] =
 	 RF_POWER_N23p54dBm,
 };
 
+_attribute_data_retention_sec_	static rf_status_e s_rf_trxstate = RF_MODE_TX;
 rf_mode_e   g_rfmode;
 
 /**********************************************************************************************************************
@@ -441,6 +442,44 @@ void rf_set_txmode(void)
 	reg_rf_ll_ctrl0 = 0x45;// reset tx/rx state machine.
 	reg_rf_ll_ctrl0 |= FLD_RF_R_TX_EN_MAN;
 	reg_rf_rxmode &= (~FLD_RF_RX_ENABLE);
+}
+
+/**
+ * @brief	  	This function serves to judge RF Tx/Rx state.
+ * @param[in]	rf_status   - Tx/Rx status.
+ * @param[in]	rf_channel  - This param serve to set frequency channel(2400+rf_channel) .
+ * @return	 	Whether the setting is successful(-1:failed;else success).
+ */
+int rf_set_trx_state(rf_status_e rf_status, signed char rf_channel)
+{
+	  int err = 0;
+
+      reg_rf_ll_ctrl0 = 0x45;			// reset tx/rx state machine.
+      rf_set_chn(rf_channel);
+
+    if (rf_status == RF_MODE_TX) {
+    	rf_set_txmode();
+        s_rf_trxstate = RF_MODE_TX;
+    }
+    else if (rf_status == RF_MODE_RX) {
+    	rf_set_rxmode();
+    	s_rf_trxstate = RF_MODE_RX;
+    }
+    else if(rf_status == RF_MODE_OFF){
+    	rf_set_tx_rx_off();
+    	s_rf_trxstate = RF_MODE_OFF;
+    }
+    else if (rf_status == RF_MODE_AUTO) {
+    	reg_rf_ll_cmd = 0x80;		//stop cmd.
+    	reg_rf_ll_ctrl3 = 0x29;		// reg0x140a16 pll_en_man and tx_en_dly_en  enable.
+    	reg_rf_rxmode |= (~FLD_RF_RX_ENABLE);	//rx disable.
+    	reg_rf_ll_ctrl0 &=0xce;			//reg0x140a02 disable rx_en_man and tx_en_man.
+        s_rf_trxstate = RF_MODE_AUTO;
+    }
+    else {
+        err = -1;
+    }
+    return  err;
 }
 
 /**
