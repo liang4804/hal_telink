@@ -76,7 +76,7 @@ rf_mode_e   g_rfmode;
  * @brief     This function serves to initiate information of RF.
  * @return	   none.
  */
-void rf_mode_init(void)
+ void rf_mode_init(void)
 {
 	write_reg8(0x140ed2,0x9b);//DCOC_SFIIP DCOC_SFQQP
 	write_reg8(0x140ed3,0x19);//DCOC_SFQQ
@@ -1313,4 +1313,45 @@ void rf_radio_reset(void)
 	write_reg8(0x80140f92, 0x00); // VCO_LOPATH_TXDAC_TXLPF_OW_VAL
 	write_reg8(0x80140f94, 0x00); // SEQ_SPARELV_OW_CTRL
 	write_reg8(0x80140f96, 0x00); // SEQ_SPARELV_OW_VAL
+}
+
+
+static rf_status_e s_rf_trxstate = RF_MODE_TX;
+/**
+ * @brief	  	This function serves to judge RF Tx/Rx state.
+ * @param[in]	rf_status   - Tx/Rx status.
+ * @param[in]	rf_channel  - This param serve to set frequency channel(2400+rf_channel) .
+ * @return	 	Whether the setting is successful(-1:failed;else success).
+ */
+int rf_set_trx_state(rf_status_e rf_status, signed char rf_channel)
+{
+	  int err = 0;
+
+      reg_rf_ll_ctrl0 = 0x45;			// reset tx/rx state machine.
+      rf_set_chn(rf_channel);
+
+    if (rf_status == RF_MODE_TX) {
+    	rf_set_txmode();
+        s_rf_trxstate = RF_MODE_TX;
+    }
+    else if (rf_status == RF_MODE_RX) {
+    	rf_set_rxmode();
+    	s_rf_trxstate = RF_MODE_RX;
+    }
+    else if(rf_status == RF_MODE_OFF){
+    	rf_set_tx_rx_off();
+    	s_rf_trxstate = RF_MODE_OFF;
+    }
+    else if (rf_status == RF_MODE_AUTO) {
+    	reg_rf_ll_cmd = 0x80;		//stop cmd.
+    	reg_rf_ll_ctrl3 = 0x29;		// reg0x140a16 pll_en_man and tx_en_dly_en  enable.
+    	reg_rf_rxmode |= (~FLD_RF_RX_ENABLE);	//rx disable.
+    	reg_rf_ll_ctrl0 &=0xce;			//reg0x140a02 disable rx_en_man and tx_en_man.
+        s_rf_trxstate = RF_MODE_AUTO;
+    }
+    else {
+        err = -1;
+    }
+    return  err;
+
 }
